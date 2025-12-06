@@ -1,72 +1,127 @@
 <x-layouts.app>
-    <x-slot:title>Chat - {{ $order->order_number }}</x-slot:title>
+    <x-slot:title>Chat</x-slot:title>
 
-    <div class="h-[calc(100vh-4rem)] flex flex-col">
-        <div class="bg-white border-b border-gray-200 p-4">
-            <div class="max-w-4xl mx-auto flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <a href="{{ auth()->user()->isCustomer() ? route('customer.orders.show', $order) : route('filament.worker.resources.orders.view', $order) }}" class="text-gray-500 hover:text-gray-700">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+    <div class="h-[60vh] max-w-7xl mx-auto mt-8 mb-4 flex" x-data="chatPage()" x-init="init()">
+        <!-- Conversations List (Left Panel) -->
+        <div class="w-80 border-r border-gray-200 bg-white flex flex-col">
+            <div class="p-4 border-b border-gray-200">
+                <h1 class="text-lg font-semibold text-gray-900">Messages</h1>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="conversations.length === 0">
+                    <div class="p-8 text-center text-gray-500">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                         </svg>
-                    </a>
-                    <div>
-                        <h1 class="font-semibold text-gray-900">{{ $order->order_number }}</h1>
-                        <p class="text-sm text-gray-500">
-                            {{ auth()->user()->isCustomer() ? $order->worker->name : $order->customer->name }}
-                        </p>
+                        <p>No conversations yet</p>
+                        <p class="text-sm mt-1">Start chatting when you have an order</p>
                     </div>
-                </div>
-                <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
-                    @switch($order->status->color())
-                        @case('gray') bg-gray-100 text-gray-700 @break
-                        @case('warning') bg-yellow-100 text-yellow-700 @break
-                        @case('info') bg-blue-100 text-blue-700 @break
-                        @case('primary') bg-amber-100 text-amber-700 @break
-                        @case('success') bg-green-100 text-green-700 @break
-                        @case('danger') bg-red-100 text-red-700 @break
-                    @endswitch
-                ">
-                    {{ $order->status->label() }}
-                </span>
+                </template>
+                <template x-for="conv in conversations" :key="conv.id">
+                    <a :href="'/chats/' + conv.id"
+                       class="block p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                       :class="{ 'bg-amber-50 border-l-4 border-l-amber-500': selectedOrder === conv.id }"
+                       @click.prevent="selectConversation(conv.id)">
+                        <div class="flex items-start gap-3">
+                            <img :src="conv.other_participant_avatar"
+                                 :alt="conv.other_participant_name"
+                                 class="w-10 h-10 rounded-full object-cover flex-shrink-0">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium text-gray-900 truncate" x-text="conv.other_participant_name"></span>
+                                    <span x-show="conv.unread_count > 0" class="bg-red-500 text-white text-xs font-bold rounded-full h-5 min-w-5 flex items-center justify-center px-1" x-text="conv.unread_count"></span>
+                                </div>
+                                <p class="text-sm text-gray-500 truncate" x-text="conv.order_number"></p>
+                                <template x-if="conv.last_message">
+                                    <p class="text-sm text-gray-600 truncate mt-1">
+                                        <span x-show="conv.last_message.sender_id === {{ auth()->id() }}">You: </span>
+                                        <span x-text="conv.last_message.message || (conv.last_message.is_file ? 'Sent a file' : 'Delivery notice')"></span>
+                                    </p>
+                                </template>
+                                <template x-if="!conv.chat_enabled">
+                                    <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium"
+                                          :class="conv.status_color === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                                          x-text="conv.status_label"></span>
+                                </template>
+                            </div>
+                        </div>
+                    </a>
+                </template>
             </div>
         </div>
 
-        <div class="flex-1 overflow-hidden" x-data="chatComponent()" x-init="init()">
-            <div class="max-w-4xl mx-auto h-full flex flex-col">
-                <div x-ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
-                    @foreach($order->chatMessages as $message)
-                        <div class="flex {{ $message->sender_id === auth()->id() ? 'justify-end' : 'justify-start' }}">
-                            <div class="max-w-[70%] {{ $message->sender_id === auth()->id() ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-900' }} rounded-lg p-4">
-                                @if($message->isDeliveryNotice())
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                                        </svg>
-                                        <span class="font-semibold">Delivery Notice</span>
-                                    </div>
-                                @endif
-                                @if($message->isFile())
-                                    <a href="{{ $message->file_url }}" target="_blank" class="flex items-center gap-2 underline">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                        </svg>
-                                        {{ $message->file_name }}
-                                    </a>
-                                @endif
-                                @if($message->message)
-                                    <p>{{ $message->message }}</p>
-                                @endif
-                                <p class="text-xs {{ $message->sender_id === auth()->id() ? 'text-amber-200' : 'text-gray-500' }} mt-2">
-                                    {{ $message->sender->name }} &bull; {{ $message->created_at->format('M d, g:i A') }}
-                                </p>
-                            </div>
-                        </div>
-                    @endforeach
+        <!-- Chat Panel (Right) -->
+        <div class="flex-1 flex flex-col bg-gray-50">
+            @if($order)
+                @php
+                    $otherParticipant = $order->getOtherParticipant(auth()->user());
+                @endphp
 
-                    <template x-for="message in newMessages" :key="message.id">
+                <!-- Chat Header -->
+                <div class="bg-white border-b border-gray-200 p-4">
+                    <div class="flex items-center gap-4">
+                        <button @click="selectedOrder = null" class="md:hidden text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                            </svg>
+                        </button>
+                        <img :src="otherParticipantAvatar || '{{ $otherParticipant->avatar_url }}'"
+                             :alt="otherParticipantName || '{{ $otherParticipant->name }}'"
+                             class="w-10 h-10 rounded-full object-cover">
+                        <div class="flex-1">
+                            <h2 class="font-semibold text-gray-900" x-text="otherParticipantName || '{{ $otherParticipant->name }}'">{{ $otherParticipant->name }}</h2>
+                            <p class="text-sm text-gray-500">
+                                <span x-text="orderNumber || '{{ $order->order_number }}'">{{ $order->order_number }}</span>
+                                <span class="mx-1">&bull;</span>
+                                <span x-text="orderStatus || '{{ $order->status->label() }}'">{{ $order->status->label() }}</span>
+                            </p>
+                        </div>
+                        <a href="{{ route('customer.orders.show', $order) }}"
+                           class="text-amber-600 hover:text-amber-700 text-sm font-medium">
+                            View Order
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div x-ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Server-rendered messages -->
+                    <template x-if="!messagesLoaded">
+                        @foreach($order->chatMessages as $message)
+                            <div class="flex {{ $message->sender_id === auth()->id() ? 'justify-end' : 'justify-start' }}">
+                                <div class="max-w-[70%] {{ $message->sender_id === auth()->id() ? 'bg-amber-600 text-white' : 'bg-white text-gray-900' }} rounded-lg p-4 shadow-sm">
+                                    @if($message->isDeliveryNotice())
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                            </svg>
+                                            <span class="font-semibold">Delivery Notice</span>
+                                        </div>
+                                    @endif
+                                    @if($message->isFile())
+                                        <a href="{{ $message->file_url }}" target="_blank" class="flex items-center gap-2 underline">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                            </svg>
+                                            {{ $message->file_name }}
+                                        </a>
+                                    @endif
+                                    @if($message->message)
+                                        <p>{{ $message->message }}</p>
+                                    @endif
+                                    <p class="text-xs {{ $message->sender_id === auth()->id() ? 'text-amber-200' : 'text-gray-500' }} mt-2">
+                                        {{ $message->sender->name }} &bull; {{ $message->created_at->format('M d, g:i A') }}
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </template>
+
+                    <!-- Dynamic messages (after switching conversations) -->
+                    <template x-for="message in messages" :key="message.id">
                         <div :class="message.is_own ? 'flex justify-end' : 'flex justify-start'">
-                            <div :class="message.is_own ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-900'" class="max-w-[70%] rounded-lg p-4">
+                            <div :class="message.is_own ? 'bg-amber-600 text-white' : 'bg-white text-gray-900'" class="max-w-[70%] rounded-lg p-4 shadow-sm">
                                 <template x-if="message.type === 'delivery_notice'">
                                     <div class="flex items-center gap-2 mb-2">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,43 +147,125 @@
                     </template>
                 </div>
 
-                <div class="border-t border-gray-200 p-4 bg-white">
+                <!-- Chat Disabled Notice - shown when chatEnabled is false -->
+                <div x-show="!chatEnabled" class="bg-gray-100 border-t border-gray-200 p-4 text-center text-gray-600">
+                    <p class="text-sm">
+                        This order has been <strong x-text="orderStatus ? orderStatus.toLowerCase() : '{{ strtolower($order->status->label()) }}'"></strong>. Chat is now read-only.
+                    </p>
+                </div>
+
+                <!-- Message Input - shown when chatEnabled is true -->
+                <div x-show="chatEnabled" class="border-t border-gray-200 p-4 bg-white">
                     <form @submit.prevent="sendMessage()" class="flex gap-4">
                         <input type="text" x-model="newMessage" placeholder="Type your message..."
-                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-                        <button type="submit" :disabled="!newMessage.trim() && !file" class="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+                               class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                        <button type="submit" :disabled="!newMessage.trim()"
+                                class="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
                             Send
                         </button>
                     </form>
                 </div>
-            </div>
+            @else
+                <!-- No conversation selected -->
+                <div class="flex-1 flex items-center justify-center text-gray-500">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        <p class="text-lg font-medium">Select a conversation</p>
+                        <p class="text-sm mt-1">Choose a chat from the list to start messaging</p>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 
     <script>
-        function chatComponent() {
+        function chatPage() {
             return {
-                newMessages: [],
+                selectedOrder: {{ $order ? $order->id : 'null' }},
+                messages: [],
+                messagesLoaded: false,
                 newMessage: '',
-                file: null,
                 eventSource: null,
-                lastId: {{ $order->chatMessages->last()?->id ?? 0 }},
+                lastId: {{ $order ? ($order->chatMessages->last()?->id ?? 0) : 0 }},
+                chatEnabled: {{ $order ? ($order->isChatEnabled() ? 'true' : 'false') : 'true' }},
+                otherParticipantName: null,
+                otherParticipantAvatar: null,
+                orderNumber: null,
+                orderStatus: null,
+                conversations: @json($conversationsJson),
 
                 init() {
-                    this.scrollToBottom();
+                    if (this.selectedOrder) {
+                        this.scrollToBottom();
+                        this.connect();
+                    }
+                },
+
+                async selectConversation(orderId) {
+                    if (this.selectedOrder === orderId) return;
+
+                    // Close existing connection
+                    if (this.eventSource) {
+                        this.eventSource.close();
+                    }
+
+                    this.selectedOrder = orderId;
+                    this.messages = [];
+                    this.messagesLoaded = true;
+                    this.lastId = 0;
+
+                    // Update URL without reload
+                    history.pushState({}, '', `/chats/${orderId}`);
+
+                    // Fetch messages for new conversation
+                    await this.fetchMessages(orderId);
                     this.connect();
                 },
 
+                async fetchMessages(orderId) {
+                    try {
+                        const response = await fetch(`/chats/${orderId}/messages`);
+                        const data = await response.json();
+
+                        this.messages = data.messages;
+                        this.chatEnabled = data.chat_enabled;
+                        this.orderStatus = data.order_status;
+
+                        if (this.messages.length > 0) {
+                            this.lastId = this.messages[this.messages.length - 1].id;
+                        }
+
+                        // Update header info from conversations data
+                        const conversation = this.conversations.find(c => c.id === orderId);
+                        if (conversation) {
+                            this.otherParticipantName = conversation.other_participant_name;
+                            this.otherParticipantAvatar = conversation.other_participant_avatar;
+                            this.orderNumber = conversation.order_number;
+                        }
+
+                        this.$nextTick(() => this.scrollToBottom());
+                    } catch (error) {
+                        console.error('Failed to fetch messages:', error);
+                    }
+                },
+
                 connect() {
-                    const url = '{{ auth()->user()->isCustomer() ? route('customer.chat.stream', $order) : route('worker.chat.stream', $order) }}?last_id=' + this.lastId;
+                    if (!this.selectedOrder) return;
+
+                    const url = `/chats/${this.selectedOrder}/stream?last_id=${this.lastId}`;
                     this.eventSource = new EventSource(url);
 
                     this.eventSource.onmessage = (event) => {
                         const message = JSON.parse(event.data);
-                        if (!this.newMessages.find(m => m.id === message.id)) {
-                            this.newMessages.push(message);
+                        if (!this.messages.find(m => m.id === message.id)) {
+                            this.messages.push(message);
                             this.lastId = message.id;
                             this.$nextTick(() => this.scrollToBottom());
+
+                            // Update conversation preview
+                            this.updateConversationPreview(this.selectedOrder, message);
                         }
                     };
 
@@ -139,13 +276,13 @@
                 },
 
                 async sendMessage() {
-                    if (!this.newMessage.trim()) return;
+                    if (!this.newMessage.trim() || !this.chatEnabled) return;
 
                     const formData = new FormData();
                     formData.append('message', this.newMessage);
 
                     try {
-                        const response = await fetch('{{ auth()->user()->isCustomer() ? route('customer.chat.store', $order) : route('worker.chat.store', $order) }}', {
+                        const response = await fetch(`/chats/${this.selectedOrder}`, {
                             method: 'POST',
                             headers: {
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -159,22 +296,27 @@
                             const message = data.message;
 
                             // Add message to display immediately
-                            if (!this.newMessages.find(m => m.id === message.id)) {
-                                this.newMessages.push({
-                                    id: message.id,
-                                    sender_id: message.sender_id,
-                                    sender_name: message.sender.name,
-                                    message: message.message,
-                                    type: message.type,
-                                    file_path: message.file_path,
-                                    file_name: message.file_name,
-                                    file_url: message.file_url,
-                                    created_at: message.created_at,
-                                    is_own: true,
-                                });
+                            const newMsg = {
+                                id: message.id,
+                                sender_id: message.sender_id,
+                                sender_name: message.sender.name,
+                                message: message.message,
+                                type: message.type,
+                                file_path: message.file_path,
+                                file_name: message.file_name,
+                                file_url: message.file_url,
+                                created_at: message.created_at,
+                                is_own: true,
+                            };
+
+                            if (!this.messages.find(m => m.id === message.id)) {
+                                this.messages.push(newMsg);
                                 this.lastId = message.id;
                                 this.$nextTick(() => this.scrollToBottom());
                             }
+
+                            // Update conversation preview
+                            this.updateConversationPreview(this.selectedOrder, newMsg);
 
                             this.newMessage = '';
                         }
@@ -185,13 +327,35 @@
 
                 scrollToBottom() {
                     const container = this.$refs.messagesContainer;
-                    container.scrollTop = container.scrollHeight;
+                    if (container) {
+                        container.scrollTop = container.scrollHeight;
+                    }
                 },
 
                 formatTime(isoString) {
                     const date = new Date(isoString);
                     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
                            date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                },
+
+                updateConversationPreview(orderId, message) {
+                    const conv = this.conversations.find(c => c.id === orderId);
+                    if (conv) {
+                        conv.last_message = {
+                            message: message.message,
+                            sender_id: message.sender_id,
+                            is_file: message.type === 'file',
+                            is_delivery_notice: message.type === 'delivery_notice',
+                        };
+                        // If receiving a message (not own), increment unread count for non-selected conversations
+                        if (!message.is_own && orderId !== this.selectedOrder) {
+                            conv.unread_count = (conv.unread_count || 0) + 1;
+                        }
+                        // Clear unread count for selected conversation
+                        if (orderId === this.selectedOrder) {
+                            conv.unread_count = 0;
+                        }
+                    }
                 }
             }
         }

@@ -172,4 +172,27 @@ class Order extends Model
     {
         return $query->where('status', OrderStatus::Completed);
     }
+
+    /**
+     * Check if chat is enabled for this order.
+     * Chat is disabled for completed or cancelled orders.
+     */
+    public function isChatEnabled(): bool
+    {
+        return !in_array($this->status, [
+            OrderStatus::Completed,
+            OrderStatus::Cancelled,
+        ]);
+    }
+
+    /**
+     * Get the other participant in the chat.
+     * Returns the worker if user is customer, or customer if user is worker.
+     */
+    public function getOtherParticipant(User $user): User
+    {
+        return $user->id === $this->customer_id
+            ? $this->worker
+            : $this->customer;
+    }
 }

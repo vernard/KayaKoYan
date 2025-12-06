@@ -37,6 +37,17 @@
                         </a>
                     @else
                         @if(auth()->user()->isCustomer())
+                            <a href="{{ route('chats.index') }}" class="relative text-gray-600 hover:text-gray-900 text-sm font-medium" x-data="chatBadge()" x-init="init()">
+                                <span class="flex items-center gap-1">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                    </svg>
+                                    Chat
+                                </span>
+                                <span x-show="unreadCount > 0" x-text="unreadCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 min-w-5 flex items-center justify-center px-1"></span>
+                            </a>
+                        @endif
+                        @if(auth()->user()->isCustomer())
                             <a href="{{ route('customer.dashboard') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium">
                                 Dashboard
                             </a>
@@ -82,5 +93,30 @@
             </div>
         </div>
     </footer>
+    @auth
+        @if(auth()->user()->isCustomer())
+        <script>
+            function chatBadge() {
+                return {
+                    unreadCount: 0,
+                    init() {
+                        this.fetchUnreadCount();
+                        // Poll every 30 seconds
+                        setInterval(() => this.fetchUnreadCount(), 30000);
+                    },
+                    async fetchUnreadCount() {
+                        try {
+                            const response = await fetch('{{ route("chats.unread") }}');
+                            const data = await response.json();
+                            this.unreadCount = data.count;
+                        } catch (error) {
+                            console.error('Failed to fetch unread count:', error);
+                        }
+                    }
+                }
+            }
+        </script>
+        @endif
+    @endauth
 </body>
 </html>

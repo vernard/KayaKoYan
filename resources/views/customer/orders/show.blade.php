@@ -164,7 +164,7 @@
                         </div>
                     @endif
 
-                    <a href="{{ route('customer.chat.index', $order) }}" class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:bg-gray-50 transition-colors">
+                    <a href="{{ route('chats.show', $order) }}" class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:bg-gray-50 transition-colors">
                         <div class="flex items-center gap-4">
                             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                                 <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

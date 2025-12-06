@@ -31,7 +31,15 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended($this->redirectPath());
+        // Get intended URL but filter out problematic endpoints (streams, API calls)
+        $intended = session()->pull('url.intended', $this->redirectPath());
+
+        // If intended URL is a stream or messages endpoint, redirect to dashboard instead
+        if (str_contains($intended, '/stream') || str_contains($intended, '/messages')) {
+            $intended = $this->redirectPath();
+        }
+
+        return redirect($intended);
     }
 
     public function logout(Request $request): RedirectResponse

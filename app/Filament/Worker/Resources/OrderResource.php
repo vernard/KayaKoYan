@@ -198,9 +198,9 @@ class OrderResource extends Resource
                     }),
 
                 Action::make('chat')
-                    ->label('Chat')
+                    ->label('Chat with Customer')
                     ->icon('heroicon-o-chat-bubble-left-right')
-                    ->url(fn (Order $record): string => route('worker.chat.index', $record))
+                    ->url(fn (Order $record): string => route('chats.show', $record))
                     ->openUrlInNewTab(),
             ])
             ->bulkActions([])

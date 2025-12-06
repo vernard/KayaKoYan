@@ -94,7 +94,7 @@ class ViewOrder extends ViewRecord
             Actions\Action::make('chat')
                 ->label('Chat with Customer')
                 ->icon('heroicon-o-chat-bubble-left-right')
-                ->url(fn (): string => route('worker.chat.index', $this->record))
+                ->url(fn (): string => route('chats.show', $this->record))
                 ->openUrlInNewTab(),
         ];
     }

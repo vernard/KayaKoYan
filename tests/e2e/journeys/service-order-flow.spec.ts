@@ -352,8 +352,8 @@ test.describe('Service Order Flow', () => {
     if (orderCount > 0) {
       await orderLinks.first().click();
 
-      // Click chat button if available
-      const chatLink = page.locator('a:has-text("Chat"), button:has-text("Chat")');
+      // Click chat button in main content area (not nav)
+      const chatLink = page.locator('main a:has-text("Chat"), main button:has-text("Chat")').first();
       if (await chatLink.isVisible()) {
         await chatLink.click();
 

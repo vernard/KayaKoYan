@@ -70,16 +70,22 @@ Route::middleware(['auth', 'verified', 'role:customer'])->prefix('customer')->na
 
     // Digital Download
     Route::get('/orders/{order}/download', [DigitalDownloadController::class, 'download'])->name('orders.download');
-
-    // Chat
-    Route::get('/orders/{order}/chat', [ChatController::class, 'index'])->name('chat.index');
-    Route::post('/orders/{order}/chat', [ChatController::class, 'store'])->name('chat.store');
-    Route::get('/orders/{order}/chat/stream', [ChatController::class, 'stream'])->name('chat.stream');
 });
 
-// Worker Chat Routes (for accessing chat from Filament)
-Route::middleware(['auth', 'verified', 'role:worker'])->prefix('worker')->name('worker.')->group(function () {
-    Route::get('/orders/{order}/chat', [ChatController::class, 'index'])->name('chat.index');
-    Route::post('/orders/{order}/chat', [ChatController::class, 'store'])->name('chat.store');
-    Route::get('/orders/{order}/chat/stream', [ChatController::class, 'stream'])->name('chat.stream');
+// Customer Chat Routes (frontend chat is for customers only)
+Route::middleware(['auth', 'verified', 'role:customer'])->prefix('chats')->name('chats.')->group(function () {
+    Route::get('/', [ChatController::class, 'index'])->name('index');
+    Route::get('/unread', [ChatController::class, 'unreadCount'])->name('unread');
+    Route::get('/{order}', [ChatController::class, 'show'])->name('show');
+    Route::post('/{order}', [ChatController::class, 'store'])->name('store');
+    Route::get('/{order}/messages', [ChatController::class, 'messages'])->name('messages');
+    Route::get('/{order}/stream', [ChatController::class, 'stream'])->name('stream');
+});
+
+// Worker Chat Routes (for Filament chat page)
+Route::middleware(['auth', 'verified', 'role:worker'])->prefix('worker/chats')->name('worker.chats.')->group(function () {
+    Route::get('/unread', [ChatController::class, 'unreadCount'])->name('unread');
+    Route::post('/{order}', [ChatController::class, 'store'])->name('store');
+    Route::get('/{order}/messages', [ChatController::class, 'messages'])->name('messages');
+    Route::get('/{order}/stream', [ChatController::class, 'stream'])->name('stream');
 });
