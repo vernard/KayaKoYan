@@ -3,11 +3,11 @@ FROM serversideup/php:8.4-fpm-apache AS base
 
 USER root
 
-#RUN apt-get update && apt-get install -y \
-#    wget \
-#    vim \
-#    nano \
-#    && apt-get clean
+RUN apt-get update && apt-get install -y \
+    wget \
+    vim \
+    nano \
+    && apt-get clean
 
 # Install GD extension always
 RUN install-php-extensions gd intl
@@ -17,7 +17,8 @@ FROM base AS production
 USER root
 COPY ./ /var/www/html/
 RUN composer install
-RUN chown -R www-data:www-data /var/www/html
+RUN npm install && npm run build
+RUN chown -R www-data:www-data /var/www/html/!(node_modules)
 USER www-data
 
 
