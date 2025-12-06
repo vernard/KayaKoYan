@@ -14,13 +14,28 @@ RUN install-php-extensions gd intl
 
 # Production stage (default target)
 FROM base AS production
-USER root
-COPY ./ /var/www/html/
-RUN composer install
-RUN npm install && npm run build
-RUN chown -R www-data:www-data /var/www/html/!(node_modules)
+
+# Install Node.js and NPM
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Switch back to the unprivileged user (www-data) for security
 USER www-data
 
+# Show node and npm version
+RUN node --version
+RUN npm --version
+
+# Copy your application code
+COPY --chown=www-data:www-data . /var/www/html/
+
+# Install NPM dependencies and build assets
+RUN npm install
+RUN npm run build
+
+RUN composer install --no-interaction --optimize-autoloader
+# Clean up image
+RUN rm /var/www/html/node_modules -rf
 
 # Development stage with XDebug
 FROM base AS development
