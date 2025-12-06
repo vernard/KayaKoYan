@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Observers\DeliveryObserver;
 use App\Observers\OrderObserver;
 use App\Observers\PaymentObserver;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,5 +23,8 @@ class AppServiceProvider extends ServiceProvider
         Order::observe(OrderObserver::class);
         Payment::observe(PaymentObserver::class);
         Delivery::observe(DeliveryObserver::class);
+
+        // Register broadcast routes for channel authorization
+        Broadcast::routes(['middleware' => ['web', 'auth']]);
     }
 }

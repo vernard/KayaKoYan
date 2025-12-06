@@ -79,7 +79,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])->prefix('chats')->name(
     Route::get('/{order}', [ChatController::class, 'show'])->name('show');
     Route::post('/{order}', [ChatController::class, 'store'])->name('store');
     Route::get('/{order}/messages', [ChatController::class, 'messages'])->name('messages');
-    Route::get('/{order}/stream', [ChatController::class, 'stream'])->name('stream');
+    Route::post('/{order}/typing', [ChatController::class, 'typing'])->name('typing');
+    Route::post('/{order}/read', [ChatController::class, 'markRead'])->name('read');
 });
 
 // Worker Chat Routes (for Filament chat page)
@@ -87,5 +88,6 @@ Route::middleware(['auth', 'verified', 'role:worker'])->prefix('worker/chats')->
     Route::get('/unread', [ChatController::class, 'unreadCount'])->name('unread');
     Route::post('/{order}', [ChatController::class, 'store'])->name('store');
     Route::get('/{order}/messages', [ChatController::class, 'messages'])->name('messages');
-    Route::get('/{order}/stream', [ChatController::class, 'stream'])->name('stream');
+    Route::post('/{order}/typing', [ChatController::class, 'typing'])->name('typing');
+    Route::post('/{order}/read', [ChatController::class, 'markRead'])->name('read');
 });

@@ -58,7 +58,7 @@ class Chat extends Page
             return [
                 'id' => $c->id,
                 'customer_name' => $c->customer->name,
-                'customer_initials' => substr($c->customer->name, 0, 2),
+                'customer_avatar' => $c->customer->avatar_url,
                 'order_number' => $c->order_number,
                 'status' => $c->status->label(),
                 'status_color' => $c->status->color(),

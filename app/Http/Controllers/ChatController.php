@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ChatMessageType;
+use App\Events\ChatMessageSent;
+use App\Events\MessagesRead;
+use App\Events\UserTyping;
 use App\Models\ChatMessage;
 use App\Models\Order;
 use App\Services\ChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
 {
@@ -115,74 +117,71 @@ class ChatController extends Controller
             'file_name' => $fileName,
         ]);
 
+        $message->load('sender');
+
+        // Broadcast the message via WebSocket
+        broadcast(new ChatMessageSent($message, $order))->toOthers();
+
         return response()->json([
             'success' => true,
-            'message' => $message->load('sender'),
+            'message' => $message,
         ]);
     }
 
     /**
-     * Stream chat messages via SSE.
+     * Broadcast typing indicator.
      */
-    public function stream(Order $order): StreamedResponse
+    public function typing(Request $request, Order $order): JsonResponse
     {
         $this->authorize('chat', $order);
 
-        return response()->stream(function () use ($order) {
-            $lastId = request()->query('last_id', 0);
-            $timeout = 0;
-            $maxTimeout = 30;
+        $validated = $request->validate([
+            'is_typing' => ['required', 'boolean'],
+        ]);
 
-            while ($timeout < $maxTimeout) {
-                $messages = ChatMessage::with('sender')
-                    ->where('order_id', $order->id)
-                    ->where('id', '>', $lastId)
-                    ->orderBy('id')
-                    ->get();
+        broadcast(new UserTyping(
+            $order,
+            auth()->user(),
+            $validated['is_typing']
+        ))->toOthers();
 
-                if ($messages->isNotEmpty()) {
-                    $lastId = $messages->last()->id;
+        return response()->json(['success' => true]);
+    }
 
-                    foreach ($messages as $message) {
-                        if ($message->sender_id !== auth()->id()) {
-                            $message->markAsRead();
-                        }
+    /**
+     * Mark messages as read and broadcast.
+     */
+    public function markRead(Order $order): JsonResponse
+    {
+        $this->authorize('chat', $order);
 
-                        $data = [
-                            'id' => $message->id,
-                            'sender_id' => $message->sender_id,
-                            'sender_name' => $message->sender->name,
-                            'message' => $message->message,
-                            'type' => $message->type->value,
-                            'file_path' => $message->file_path,
-                            'file_name' => $message->file_name,
-                            'file_url' => $message->file_url,
-                            'created_at' => $message->created_at->toISOString(),
-                            'is_own' => $message->sender_id === auth()->id(),
-                        ];
+        $user = auth()->user();
 
-                        echo "data: " . json_encode($data) . "\n\n";
-                        ob_flush();
-                        flush();
-                    }
-                }
+        // Get unread message IDs before marking
+        $unreadMessageIds = ChatMessage::where('order_id', $order->id)
+            ->where('sender_id', '!=', $user->id)
+            ->whereNull('read_at')
+            ->pluck('id')
+            ->toArray();
 
-                echo ": heartbeat\n\n";
-                ob_flush();
-                flush();
+        if (empty($unreadMessageIds)) {
+            return response()->json(['success' => true, 'marked' => 0]);
+        }
 
-                if (connection_aborted()) {
-                    break;
-                }
+        // Mark messages as read
+        ChatMessage::whereIn('id', $unreadMessageIds)
+            ->update(['read_at' => now()]);
 
-                sleep(1);
-                $timeout += 1;
-            }
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no',
+        // Broadcast read receipt
+        broadcast(new MessagesRead(
+            $order,
+            $user,
+            $unreadMessageIds
+        ))->toOthers();
+
+        return response()->json([
+            'success' => true,
+            'marked' => count($unreadMessageIds),
         ]);
     }
 

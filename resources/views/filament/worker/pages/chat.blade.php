@@ -22,9 +22,9 @@
                        :class="{ 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-amber-500': selectedOrder === conv.id }"
                        @click="selectConversation(conv.id)">
                         <div class="flex items-start gap-3">
-                            <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center flex-shrink-0">
-                                <span class="text-amber-700 dark:text-amber-300 font-medium text-sm" x-text="conv.customer_initials"></span>
-                            </div>
+                            <img :src="conv.customer_avatar"
+                                 :alt="conv.customer_name"
+                                 class="w-10 h-10 rounded-full object-cover flex-shrink-0">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between">
                                     <span class="font-medium text-gray-900 dark:text-white truncate" x-text="conv.customer_name"></span>
@@ -56,15 +56,18 @@
                 <!-- Chat Header -->
                 <div class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 flex-shrink-0">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center flex-shrink-0">
-                            <span class="text-amber-700 dark:text-amber-300 font-medium text-sm" x-text="otherParticipantInitials"></span>
-                        </div>
+                        <img :src="otherParticipantAvatar"
+                             :alt="otherParticipantName"
+                             class="w-10 h-10 rounded-full object-cover flex-shrink-0">
                         <div class="flex-1 min-w-0">
                             <h3 class="font-semibold text-gray-900 dark:text-white truncate" x-text="otherParticipantName"></h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400">
                                 <span x-text="orderNumber"></span>
                                 <span class="mx-1">&bull;</span>
                                 <span x-text="orderStatus"></span>
+                                <span class="mx-1">&bull;</span>
+                                <span x-show="isOtherOnline" class="text-green-600 dark:text-green-400">Online</span>
+                                <span x-show="!isOtherOnline" class="text-gray-400">Offline</span>
                             </p>
                         </div>
                         <a :href="'/worker/orders/' + selectedOrder"
@@ -104,6 +107,11 @@
                     </template>
                 </div>
 
+                <!-- Typing Indicator -->
+                <div x-show="isOtherTyping" x-transition class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+                    <span x-text="otherTypingName"></span> is typing...
+                </div>
+
                 <!-- Chat Disabled Notice -->
                 <div x-show="!chatEnabled" class="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 text-center text-gray-600 dark:text-gray-400 flex-shrink-0">
                     <p class="text-sm">
@@ -114,7 +122,7 @@
                 <!-- Message Input -->
                 <div x-show="chatEnabled" class="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 flex-shrink-0">
                     <form @submit.prevent="sendMessage()" class="flex gap-4">
-                        <input type="text" x-model="newMessage" placeholder="Type your message..."
+                        <input type="text" x-model="newMessage" @input="onInputChange()" placeholder="Type your message..."
                                class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-800 dark:text-white">
                         <button type="submit" :disabled="!newMessage.trim()"
                                 class="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
@@ -143,19 +151,27 @@
                 selectedOrder: {{ $selectedOrder ? $selectedOrder->id : 'null' }},
                 messages: [],
                 newMessage: '',
-                eventSource: null,
                 lastId: 0,
                 chatEnabled: true,
                 otherParticipantName: '',
-                otherParticipantInitials: '',
+                otherParticipantAvatar: '',
                 orderNumber: '',
                 orderStatus: '',
                 conversationsData: @json($conversationsJson),
 
+                // WebSocket-related properties
+                channel: null,
+                presenceChannel: null,
+                isOtherTyping: false,
+                otherTypingName: '',
+                typingTimeout: null,
+                typingDebounce: null,
+                isOtherOnline: false,
+
                 init() {
                     if (this.selectedOrder) {
                         this.loadConversation(this.selectedOrder);
-                        this.connect();
+                        this.subscribeToChannel();
                     }
                 },
 
@@ -165,49 +181,123 @@
                         this.messages = conversation.messages;
                         this.chatEnabled = conversation.chat_enabled;
                         this.otherParticipantName = conversation.customer_name;
-                        this.otherParticipantInitials = conversation.customer_name.substring(0, 2);
+                        this.otherParticipantAvatar = conversation.customer_avatar;
                         this.orderNumber = conversation.order_number;
                         this.orderStatus = conversation.status;
                         this.lastId = this.messages.length > 0 ? this.messages[this.messages.length - 1].id : 0;
                         this.$nextTick(() => this.scrollToBottom());
+
+                        // Mark messages as read
+                        this.markMessagesAsRead();
                     }
                 },
 
                 selectConversation(orderId) {
                     if (this.selectedOrder === orderId) return;
 
-                    // Close existing connection
-                    if (this.eventSource) {
-                        this.eventSource.close();
-                    }
+                    // Unsubscribe from previous channel
+                    this.unsubscribeFromChannel();
 
                     this.selectedOrder = orderId;
+                    this.isOtherTyping = false;
+                    this.isOtherOnline = false;
                     this.loadConversation(orderId);
-                    this.connect();
+                    this.subscribeToChannel();
                 },
 
-                connect() {
-                    if (!this.selectedOrder) return;
+                subscribeToChannel() {
+                    if (!this.selectedOrder || !window.Echo) return;
 
-                    const url = `/worker/chats/${this.selectedOrder}/stream?last_id=${this.lastId}`;
-                    this.eventSource = new EventSource(url);
+                    const currentUserId = {{ auth()->id() }};
 
-                    this.eventSource.onmessage = (event) => {
-                        const message = JSON.parse(event.data);
-                        if (!this.messages.find(m => m.id === message.id)) {
-                            this.messages.push(message);
-                            this.lastId = message.id;
-                            this.$nextTick(() => this.scrollToBottom());
+                    // Subscribe to private chat channel
+                    this.channel = window.Echo.private(`order.${this.selectedOrder}.chat`)
+                        .listen('.message.sent', (data) => {
+                            this.handleNewMessage(data, currentUserId);
+                        })
+                        .listen('.user.typing', (data) => {
+                            this.handleTypingIndicator(data, currentUserId);
+                        })
+                        .listen('.messages.read', (data) => {
+                            this.handleReadReceipt(data, currentUserId);
+                        });
 
-                            // Update conversation preview
-                            this.updateConversationPreview(this.selectedOrder, message);
+                    // Subscribe to presence channel for online status
+                    this.presenceChannel = window.Echo.join(`order.${this.selectedOrder}.presence`)
+                        .here((users) => {
+                            const otherUser = users.find(u => u.id !== currentUserId);
+                            this.isOtherOnline = !!otherUser;
+                        })
+                        .joining((user) => {
+                            if (user.id !== currentUserId) {
+                                this.isOtherOnline = true;
+                            }
+                        })
+                        .leaving((user) => {
+                            if (user.id !== currentUserId) {
+                                this.isOtherOnline = false;
+                            }
+                        });
+                },
+
+                unsubscribeFromChannel() {
+                    if (this.channel) {
+                        window.Echo.leave(`order.${this.selectedOrder}.chat`);
+                        this.channel = null;
+                    }
+                    if (this.presenceChannel) {
+                        window.Echo.leave(`order.${this.selectedOrder}.presence`);
+                        this.presenceChannel = null;
+                    }
+                },
+
+                handleNewMessage(data, currentUserId) {
+                    // Check if message already exists
+                    if (this.messages.find(m => m.id === data.id)) return;
+
+                    const message = {
+                        ...data,
+                        is_own: data.sender_id === currentUserId,
+                    };
+
+                    this.messages.push(message);
+                    this.lastId = message.id;
+                    this.$nextTick(() => this.scrollToBottom());
+
+                    // Update conversation preview
+                    this.updateConversationPreview(this.selectedOrder, message);
+
+                    // Mark as read if we're viewing this conversation
+                    if (!message.is_own) {
+                        this.markMessagesAsRead();
+                    }
+                },
+
+                handleTypingIndicator(data, currentUserId) {
+                    if (data.user_id === currentUserId) return;
+
+                    this.isOtherTyping = data.is_typing;
+                    this.otherTypingName = data.user_name;
+
+                    // Auto-clear typing indicator after 3 seconds
+                    if (data.is_typing) {
+                        clearTimeout(this.typingTimeout);
+                        this.typingTimeout = setTimeout(() => {
+                            this.isOtherTyping = false;
+                        }, 3000);
+                    }
+                },
+
+                handleReadReceipt(data, currentUserId) {
+                    if (data.reader_id === currentUserId) return;
+
+                    // Update read status on messages
+                    data.message_ids.forEach(id => {
+                        const message = this.messages.find(m => m.id === id);
+                        if (message) {
+                            message.read_at = data.read_at;
                         }
-                    };
-
-                    this.eventSource.onerror = () => {
-                        this.eventSource.close();
-                        setTimeout(() => this.connect(), 5000);
-                    };
+                    });
                 },
 
                 async sendMessage() {
@@ -230,7 +320,7 @@
                             const data = await response.json();
                             const message = data.message;
 
-                            // Add message to display immediately
+                            // Add message to display immediately (optimistic update)
                             const newMsg = {
                                 id: message.id,
                                 sender_id: message.sender_id,
@@ -242,6 +332,7 @@
                                 file_url: message.file_url,
                                 created_at: message.created_at,
                                 is_own: true,
+                                read_at: null,
                             };
 
                             if (!this.messages.find(m => m.id === message.id)) {
@@ -254,9 +345,56 @@
                             this.updateConversationPreview(this.selectedOrder, newMsg);
 
                             this.newMessage = '';
+
+                            // Stop typing indicator
+                            this.sendTypingIndicator(false);
                         }
                     } catch (error) {
                         console.error('Failed to send message:', error);
+                    }
+                },
+
+                // Debounced typing indicator
+                onInputChange() {
+                    this.sendTypingIndicator(true);
+
+                    clearTimeout(this.typingDebounce);
+                    this.typingDebounce = setTimeout(() => {
+                        this.sendTypingIndicator(false);
+                    }, 2000);
+                },
+
+                async sendTypingIndicator(isTyping) {
+                    if (!this.selectedOrder || !this.chatEnabled) return;
+
+                    try {
+                        await fetch(`/worker/chats/${this.selectedOrder}/typing`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ is_typing: isTyping })
+                        });
+                    } catch (error) {
+                        // Silently fail for typing indicators
+                    }
+                },
+
+                async markMessagesAsRead() {
+                    if (!this.selectedOrder) return;
+
+                    try {
+                        await fetch(`/worker/chats/${this.selectedOrder}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json',
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Failed to mark messages as read:', error);
                     }
                 },
 
