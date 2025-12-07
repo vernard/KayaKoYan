@@ -42,6 +42,12 @@ class WorkerPanelProvider extends PanelProvider
                 fn (): string => Blade::render('
                     <audio id="notification-sound" src="/sounds/notification.mp3" preload="auto"></audio>
                     <script>window.userId = {{ auth()->id() }};</script>
+                    <script>
+                        window.REVERB_APP_KEY = "{{ config(\'reverb.apps.apps.0.key\') }}";
+                        window.REVERB_HOST = "{{ config(\'reverb.apps.apps.0.options.host\') }}";
+                        window.REVERB_PORT = "{{ config(\'reverb.apps.apps.0.options.port\') }}";
+                        window.REVERB_SCHEME = "{{ config(\'reverb.apps.apps.0.options.scheme\') }}";
+                    </script>
                     @vite(\'resources/js/bootstrap.js\')
                     <script>
                         // Define updateUnreadTitle for worker panel

@@ -16,6 +16,12 @@
     @guest
     <script>window.userId = null;</script>
     @endguest
+    <script>
+        window.REVERB_APP_KEY = '{{ config('reverb.apps.apps.0.key') }}';
+        window.REVERB_HOST = '{{ config('reverb.apps.apps.0.options.host') }}';
+        window.REVERB_PORT = '{{ config('reverb.apps.apps.0.options.port') }}';
+        window.REVERB_SCHEME = '{{ config('reverb.apps.apps.0.options.scheme') }}';
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-gray-50 flex flex-col">
