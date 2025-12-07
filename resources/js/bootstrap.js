@@ -69,6 +69,42 @@ window.titleFlashInterval = null;
 window.updateUnreadTitle = function(count) {
     window.totalUnread = count;
 
+    // Update Filament sidebar badge (worker panel)
+    const navLink = document.querySelector('a[href$="/worker/chat"]');
+    if (navLink) {
+        let badgeContainer = navLink.querySelector('.fi-sidebar-item-badge-ctn');
+
+        if (count > 0) {
+            if (!badgeContainer) {
+                // Create badge structure matching Filament's markup
+                badgeContainer = document.createElement('span');
+                badgeContainer.className = 'fi-sidebar-item-badge-ctn';
+
+                const badge = document.createElement('span');
+                badge.className = 'fi-badge flex items-center justify-center gap-x-1 rounded-md text-xs font-medium ring-1 ring-inset px-1.5 min-w-[theme(spacing.5)] py-0.5 fi-color-custom bg-custom-50 text-custom-600 ring-custom-600/10 dark:bg-custom-400/10 dark:text-custom-400 dark:ring-custom-400/30 fi-color-danger';
+                badge.style.setProperty('--c-50', 'var(--danger-50)');
+                badge.style.setProperty('--c-400', 'var(--danger-400)');
+                badge.style.setProperty('--c-600', 'var(--danger-600)');
+
+                const labelCtn = document.createElement('span');
+                labelCtn.className = 'fi-badge-label-ctn';
+                const label = document.createElement('span');
+                label.className = 'fi-badge-label';
+                labelCtn.appendChild(label);
+                badge.appendChild(labelCtn);
+                badgeContainer.appendChild(badge);
+                navLink.appendChild(badgeContainer);
+            }
+
+            const label = badgeContainer.querySelector('.fi-badge-label');
+            if (label) label.textContent = count;
+            badgeContainer.style.display = '';
+        } else if (badgeContainer) {
+            badgeContainer.style.display = 'none';
+        }
+    }
+
+    // Title flash logic
     if (count > 0 && !window.titleFlashInterval) {
         let showUnread = true;
         window.titleFlashInterval = setInterval(() => {
@@ -93,3 +129,17 @@ window.updateUnreadTitle = function(count) {
         }, 1000);
     }
 };
+
+// Set up notification listener for worker panel (non-chat pages)
+// The chat page sets up its own listener in the Alpine component
+if (window.userId && window.location.pathname.startsWith('/worker') && !window.location.pathname.endsWith('/worker/chat')) {
+    window.Echo.private(`user.${window.userId}.notifications`)
+        .listen('.unread.updated', (data) => {
+            // Play notification sound
+            const audio = document.getElementById('notification-sound');
+            if (audio) audio.play().catch(() => {});
+
+            // Update title and badge
+            window.updateUnreadTitle(data.count);
+        });
+}

@@ -49,41 +49,6 @@ class WorkerPanelProvider extends PanelProvider
                         window.REVERB_SCHEME = "{{ config(\'reverb.apps.apps.0.options.scheme\') }}";
                     </script>
                     @vite(\'resources/js/bootstrap.js\')
-                    <script>
-                        // Define updateUnreadTitle for worker panel
-                        window.updateUnreadTitle = function(count) {
-                            // Update page title
-                            var baseTitle = "Kaya Ko Yan - Worker";
-                            document.title = count > 0 ? "(" + count + ") " + baseTitle : baseTitle;
-
-                            // Update Filament sidebar badge
-                            var badge = document.querySelector(\'[href$="/worker/chat"] .fi-badge\');
-                            if (badge) {
-                                if (count > 0) {
-                                    badge.textContent = count;
-                                    badge.style.display = "";
-                                } else {
-                                    badge.style.display = "none";
-                                }
-                            }
-                        };
-
-                        document.addEventListener("DOMContentLoaded", function() {
-                            if (window.Echo && window.userId) {
-                                window.Echo.private("user." + window.userId + ".notifications")
-                                    .listen(".unread.updated", function(data) {
-                                        // Play notification sound only if not on chat page
-                                        if (!window.location.pathname.endsWith("/worker/chat")) {
-                                            var audio = document.getElementById("notification-sound");
-                                            if (audio) audio.play().catch(function() {});
-                                        }
-
-                                        // Update title and badge
-                                        window.updateUnreadTitle(data.count);
-                                    });
-                            }
-                        });
-                    </script>
                 ')
             )
             ->brandName('Kaya Ko Yan - Worker')
