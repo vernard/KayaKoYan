@@ -5,10 +5,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid lg:grid-cols-3 gap-8">
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" x-data="{ selectedImage: '{{ $listing->primaryImage?->url }}' }">
                         <div class="aspect-video bg-gray-100">
                             @if($listing->primaryImage)
-                                <img src="{{ $listing->primaryImage->url }}" alt="{{ $listing->title }}" class="w-full h-full object-cover">
+                                <img :src="selectedImage" alt="{{ $listing->title }}" class="w-full h-full object-cover">
                             @else
                                 <div class="w-full h-full flex items-center justify-center text-gray-400">
                                     <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,7 +21,11 @@
                         @if($listing->images->count() > 1)
                             <div class="p-4 flex gap-2 overflow-x-auto">
                                 @foreach($listing->images as $image)
-                                    <img src="{{ $image->url }}" alt="{{ $listing->title }}" class="w-20 h-20 object-cover rounded-lg border border-gray-200">
+                                    <img src="{{ $image->url }}"
+                                         alt="{{ $listing->title }}"
+                                         @click="selectedImage = '{{ $image->url }}'"
+                                         :class="{ 'ring-2 ring-amber-500': selectedImage === '{{ $image->url }}' }"
+                                         class="w-20 h-20 object-cover rounded-lg cursor-pointer border border-gray-200 transition-all">
                                 @endforeach
                             </div>
                         @endif
