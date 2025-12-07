@@ -13,11 +13,6 @@ services:
       REVERB_HOST: reverb
       REVERB_PORT: 8080
       REVERB_SCHEME: http
-      # Frontend WebSocket connection (public)
-      VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-kayakoyan-key}
-      VITE_REVERB_HOST: ${VITE_REVERB_HOST} # Set in .env - your public domain
-      VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
-      VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
     depends_on:
       - db
       - reverb
