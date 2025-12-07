@@ -38,7 +38,7 @@ services:
       REVERB_SERVER_PORT: 8080
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.reverb-ws.rule=Host(`${REVERB_HOST}`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.reverb-ws.rule=Host(`kky.luzcommerce.com`) && PathPrefix(`/app`)"
       - "traefik.http.routers.reverb-ws.entryPoints=https"
       - "traefik.http.routers.reverb-ws.tls=true"
       - "traefik.http.routers.reverb-ws.tls.certresolver=letsencrypt"
