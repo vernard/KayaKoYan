@@ -6,15 +6,6 @@ services:
       target: production
     volumes:
       - laravel_storage:/var/www/html/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    labels:
-      - "traefik.http.services.app.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.app.loadbalancer.healthcheck.interval=5s"
     environment:
       PHP_OPCACHE_ENABLE: 1
       BROADCAST_CONNECTION: reverb

@@ -16,9 +16,6 @@ use App\Http\Controllers\ListingController;
 use App\Http\Controllers\WorkerProfileController;
 use Illuminate\Support\Facades\Route;
 
-// Health Check (for load balancer/Traefik)
-Route::get('/health', fn () => response('OK', 200));
-
 // Public Routes
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/listings', [ListingController::class, 'index'])->name('listings.index');
