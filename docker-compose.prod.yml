@@ -8,6 +8,46 @@ services:
       - laravel_storage:/var/www/html/storage
     environment:
       PHP_OPCACHE_ENABLE: 1
+      BROADCAST_CONNECTION: reverb
+      # Reverb server connection (internal)
+      REVERB_APP_ID: ${REVERB_APP_ID:-kayakoyan}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-kayakoyan-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET} # Set in .env - keep secret
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      # Frontend WebSocket connection (public)
+      VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-kayakoyan-key}
+      VITE_REVERB_HOST: ${VITE_REVERB_HOST} # Set in .env - your public domain
+      VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
+      VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
+    depends_on:
+      - db
+      - reverb
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    volumes:
+      - laravel_storage:/var/www/html/storage
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    environment:
+      REVERB_APP_ID: ${REVERB_APP_ID:-kayakoyan}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-kayakoyan-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET} # Set in .env - keep secret
+      REVERB_HOST: "0.0.0.0"
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "reverb:start"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: mariadb:10.6

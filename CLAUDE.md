@@ -1,0 +1,1 @@
+- When you introduce required .env variables, make sure you mention them in docker-compose.prod.yml and add a relevant default value. If default value is private, just add a comment to add it on .env. By having it on the compose file, Coolify will automatically add the env variable and it's easier to notice.
