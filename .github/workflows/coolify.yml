@@ -1,0 +1,15 @@
+name: Deploy to Coolify
+
+on:
+  workflow_dispatch:  # Manual trigger
+  workflow_call:      # Called by other workflows
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deployment
+        run: |
+          curl \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_KEY }}" \
+            ${{ secrets.COOLIFY_WEBHOOK }}

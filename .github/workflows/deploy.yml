@@ -52,8 +52,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger Coolify deployment
-        run: |
-          curl \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_KEY }}" \
-            ${{ secrets.COOLIFY_WEBHOOK }}
+  trigger-coolify:
+    needs: build-and-deploy
+    uses: ./.github/workflows/coolify.yml
+    secrets: inherit
