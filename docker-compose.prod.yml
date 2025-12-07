@@ -25,7 +25,10 @@ services:
       - reverb
 
   reverb:
-    image: ghcr.io/vernard/kayakoyan:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
     volumes:
       - laravel_storage:/var/www/html/storage
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
@@ -33,6 +36,14 @@ services:
       # Server bind address - must be IP, not hostname
       REVERB_SERVER_HOST: "0.0.0.0"
       REVERB_SERVER_PORT: 8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reverb-ws.rule=Host(`${REVERB_HOST}`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.reverb-ws.entrypoints=websecure"
+      - "traefik.http.routers.reverb-ws.tls=true"
+      - "traefik.http.services.reverb-ws.loadbalancer.server.port=8080"
+    networks:
+      - coolify
     healthcheck:
       test: ["CMD", "pgrep", "-f", "reverb:start"]
       interval: 10s
@@ -70,3 +81,7 @@ services:
 volumes:
   dbdata:
   laravel_storage:
+
+networks:
+  coolify:
+    external: true
