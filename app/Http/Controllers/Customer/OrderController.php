@@ -14,7 +14,9 @@ class OrderController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = auth()->user()->customerOrders()
+        $user = auth()->user();
+
+        $query = $user->customerOrders()
             ->with(['listing.images', 'worker', 'payments']);
 
         if ($request->filled('status')) {
@@ -23,7 +25,10 @@ class OrderController extends Controller
 
         $orders = $query->latest()->paginate(10);
 
-        return view('customer.orders.index', compact('orders'));
+        $activeOrders = $user->customerOrders()->active()->count();
+        $completedOrders = $user->customerOrders()->completed()->count();
+
+        return view('customer.orders.index', compact('orders', 'activeOrders', 'completedOrders'));
     }
 
     public function show(Order $order): View

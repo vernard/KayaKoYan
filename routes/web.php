@@ -10,6 +10,7 @@ use App\Http\Controllers\Customer\DashboardController as CustomerDashboardContro
 use App\Http\Controllers\Customer\DigitalDownloadController;
 use App\Http\Controllers\Customer\OrderController as CustomerOrderController;
 use App\Http\Controllers\Customer\PaymentController;
+use App\Http\Controllers\Customer\ProfileController as CustomerProfileController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\WorkerProfileController;
@@ -70,6 +71,12 @@ Route::middleware(['auth', 'verified', 'role:customer'])->prefix('customer')->na
 
     // Digital Download
     Route::get('/orders/{order}/download', [DigitalDownloadController::class, 'download'])->name('orders.download');
+
+    // Profile
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile/avatar', [CustomerProfileController::class, 'deleteAvatar'])->name('profile.delete-avatar');
+    Route::put('/profile/password', [CustomerProfileController::class, 'updatePassword'])->name('profile.update-password');
 });
 
 // Customer Chat Routes (frontend chat is for customers only)

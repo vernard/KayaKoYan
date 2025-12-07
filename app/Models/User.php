@@ -21,6 +21,7 @@ class User extends Authenticatable implements MustVerifyEmail, FilamentUser
         'email',
         'password',
         'role',
+        'avatar_path',
     ];
 
     protected $hidden = [
@@ -111,18 +112,74 @@ class User extends Authenticatable implements MustVerifyEmail, FilamentUser
     }
 
     /**
-     * Get the user's avatar URL.
+     * Get the user's avatar URL (600px version).
      * Uses UI Avatars service for placeholder avatars.
      */
     public function getAvatarUrlAttribute(): string
     {
-        // If worker has a custom avatar, use it
+        // Check user's own avatar first
+        if ($this->avatar_path) {
+            return asset('storage/' . $this->avatar_path);
+        }
+
+        // If worker has a custom avatar in their profile, use it
         if ($this->isWorker() && $this->workerProfile?->avatar_path) {
             return asset('storage/' . $this->workerProfile->avatar_path);
         }
 
-        // Generate avatar using UI Avatars service
-        $name = urlencode($this->name);
+        // Generate avatar using UI Avatars service with full initials
+        return $this->generatePlaceholderAvatar(600);
+    }
+
+    /**
+     * Get the user's small avatar URL (200px version for chat heads).
+     * Uses UI Avatars service for placeholder avatars.
+     */
+    public function getAvatarUrlSmallAttribute(): string
+    {
+        // Check user's own avatar first
+        if ($this->avatar_path) {
+            // Derive small path from main path
+            $pathInfo = pathinfo($this->avatar_path);
+            $smallPath = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . '_200.' . ($pathInfo['extension'] ?? 'jpg');
+            return asset('storage/' . $smallPath);
+        }
+
+        // If worker has a custom avatar in their profile, use it
+        if ($this->isWorker() && $this->workerProfile?->avatar_path) {
+            $pathInfo = pathinfo($this->workerProfile->avatar_path);
+            $smallPath = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . '_200.' . ($pathInfo['extension'] ?? 'jpg');
+            return asset('storage/' . $smallPath);
+        }
+
+        // Generate avatar using UI Avatars service with full initials
+        return $this->generatePlaceholderAvatar(200);
+    }
+
+    /**
+     * Get the user's initials (e.g., "JD" for "John Doe").
+     */
+    public function getInitialsAttribute(): string
+    {
+        $words = explode(' ', trim($this->name));
+        $initials = '';
+
+        foreach ($words as $word) {
+            if (!empty($word)) {
+                $initials .= mb_strtoupper(mb_substr($word, 0, 1));
+            }
+        }
+
+        // Limit to 2 characters
+        return mb_substr($initials, 0, 2);
+    }
+
+    /**
+     * Generate a placeholder avatar URL using UI Avatars service.
+     */
+    protected function generatePlaceholderAvatar(int $size = 200): string
+    {
+        $initials = urlencode($this->initials);
         $background = match($this->role) {
             UserRole::Admin => 'dc2626',   // red
             UserRole::Worker => 'd97706',  // amber
@@ -130,6 +187,6 @@ class User extends Authenticatable implements MustVerifyEmail, FilamentUser
             default => '6b7280',           // gray
         };
 
-        return "https://ui-avatars.com/api/?name={$name}&background={$background}&color=fff&size=200&bold=true";
+        return "https://ui-avatars.com/api/?name={$initials}&background={$background}&color=fff&size={$size}&bold=true";
     }
 }

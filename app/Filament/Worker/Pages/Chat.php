@@ -57,8 +57,9 @@ class Chat extends Page
             $lastMessage = $c->chatMessages->last();
             return [
                 'id' => $c->id,
+                'customer_id' => $c->customer_id,
                 'customer_name' => $c->customer->name,
-                'customer_avatar' => $c->customer->avatar_url,
+                'customer_avatar' => $c->customer->avatar_url_small,
                 'order_number' => $c->order_number,
                 'status' => $c->status->label(),
                 'status_color' => $c->status->color(),
@@ -80,6 +81,9 @@ class Chat extends Page
                         'file_path' => $m->file_path,
                         'file_name' => $m->file_name,
                         'file_url' => $m->file_path ? asset('storage/' . $m->file_path) : null,
+                        'file_size' => $m->file_size,
+                        'formatted_file_size' => $m->formatted_file_size,
+                        'is_image' => $m->isImage(),
                         'created_at' => $m->created_at->toISOString(),
                         'is_own' => $m->sender_id === $user->id,
                     ];

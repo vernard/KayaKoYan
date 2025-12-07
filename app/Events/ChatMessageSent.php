@@ -37,6 +37,9 @@ class ChatMessageSent implements ShouldBroadcastNow
             'file_path' => $this->message->file_path,
             'file_name' => $this->message->file_name,
             'file_url' => $this->message->file_url,
+            'file_size' => $this->message->file_size,
+            'formatted_file_size' => $this->message->formatted_file_size,
+            'is_image' => $this->message->isImage(),
             'created_at' => $this->message->created_at->toISOString(),
             'read_at' => $this->message->read_at?->toISOString(),
         ];

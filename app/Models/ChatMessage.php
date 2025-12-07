@@ -18,6 +18,7 @@ class ChatMessage extends Model
         'type',
         'file_path',
         'file_name',
+        'file_size',
         'read_at',
     ];
 
@@ -73,6 +74,34 @@ class ChatMessage extends Model
         }
 
         return asset('storage/' . $this->file_path);
+    }
+
+    public function isImage(): bool
+    {
+        if (!$this->file_name) {
+            return false;
+        }
+
+        $extension = strtolower(pathinfo($this->file_name, PATHINFO_EXTENSION));
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
+    }
+
+    public function getFormattedFileSizeAttribute(): ?string
+    {
+        if (!$this->file_size) {
+            return null;
+        }
+
+        $bytes = $this->file_size;
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $index = 0;
+
+        while ($bytes >= 1024 && $index < count($units) - 1) {
+            $bytes /= 1024;
+            $index++;
+        }
+
+        return round($bytes, 1) . ' ' . $units[$index];
     }
 
     public function scopeUnread($query)

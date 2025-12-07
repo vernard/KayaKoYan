@@ -9,6 +9,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Laravel\Facades\Image;
 
 class WorkerProfileSeeder extends Seeder
 {
@@ -83,14 +84,27 @@ class WorkerProfileSeeder extends Seeder
         foreach ($profiles as $email => $profileData) {
             $user = User::where('email', $email)->first();
             if ($user) {
-                // Download and save avatar
+                // Download and save avatar with resized versions
                 $avatarPath = null;
                 try {
                     $response = Http::timeout(10)->get($profileData['avatar_url']);
                     if ($response->successful()) {
-                        $filename = 'avatars/' . Str::slug($user->name) . '.jpg';
-                        Storage::disk('public')->put($filename, $response->body());
-                        $avatarPath = $filename;
+                        $uuid = Str::uuid()->toString();
+                        $mainPath = "avatars/{$uuid}.jpg";
+                        $smallPath = "avatars/{$uuid}_200.jpg";
+
+                        // Read and process the image
+                        $image = Image::read($response->body());
+
+                        // Create 600x600 version (main)
+                        $main = $image->cover(600, 600);
+                        Storage::disk('public')->put($mainPath, $main->toJpeg(85));
+
+                        // Create 200x200 version (small)
+                        $small = $image->cover(200, 200);
+                        Storage::disk('public')->put($smallPath, $small->toJpeg(85));
+
+                        $avatarPath = $mainPath;
                     }
                 } catch (\Exception $e) {
                     // Silently fail, avatar will use UI Avatars fallback

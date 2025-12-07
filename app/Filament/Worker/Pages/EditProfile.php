@@ -3,6 +3,8 @@
 namespace App\Filament\Worker\Pages;
 
 use App\Models\WorkerProfile;
+use App\Services\ImageService;
+use Filament\Forms\Components\FileUpload;
 use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -31,6 +33,7 @@ class EditProfile extends Page implements HasForms
         $profile = auth()->user()->workerProfile;
 
         $this->form->fill([
+            'avatar_path' => auth()->user()->avatar_path,
             'bio' => $profile?->bio,
             'phone' => $profile?->phone,
             'location' => $profile?->location,
@@ -49,6 +52,16 @@ class EditProfile extends Page implements HasForms
                 Section::make('Profile Information')
                     ->description('This information will be visible on your public profile.')
                     ->schema([
+                        FileUpload::make('avatar_path')
+                            ->label('Profile Photo')
+                            ->image()
+                            ->avatar()
+                            ->disk('public')
+                            ->directory('avatars')
+                            ->maxSize(20480) // 20MB max
+                            ->circleCropper()
+                            ->imageEditor(),
+
                         Textarea::make('bio')
                             ->label('About Me')
                             ->helperText('Tell customers about yourself and your services.')
@@ -105,6 +118,27 @@ class EditProfile extends Page implements HasForms
     {
         $data = $this->form->getState();
 
+        // Update avatar on user model
+        $newAvatarPath = $data['avatar_path'] ?? null;
+        unset($data['avatar_path']);
+
+        $user = auth()->user();
+        $oldAvatarPath = $user->avatar_path;
+
+        // Process avatar if it was changed
+        if ($newAvatarPath && $newAvatarPath !== $oldAvatarPath) {
+            // Process the uploaded image through ImageService
+            $imageService = app(ImageService::class);
+            $processedPath = $imageService->processAvatarFromPath($newAvatarPath, $oldAvatarPath);
+            $user->update(['avatar_path' => $processedPath]);
+        } elseif (!$newAvatarPath && $oldAvatarPath) {
+            // Avatar was removed
+            $imageService = app(ImageService::class);
+            $imageService->deleteAvatarFiles($oldAvatarPath);
+            $user->update(['avatar_path' => null]);
+        }
+
+        // Update worker profile
         $profile = auth()->user()->workerProfile;
 
         if (!$profile) {

@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 class ChatService
 {
     /**
-     * Get all orders with chat messages for a user.
+     * Get all active orders for a user (for chat).
      */
     public function getConversationsForUser(User $user): Collection
     {
@@ -20,8 +20,7 @@ class ChatService
                 $query->where('sender_id', '!=', $user->id)
                     ->whereNull('read_at');
             }])
-            ->withMax('chatMessages', 'created_at')
-            ->whereHas('chatMessages');
+            ->withMax('chatMessages', 'created_at');
 
         if ($user->isCustomer()) {
             $query->where('customer_id', $user->id);
@@ -29,7 +28,10 @@ class ChatService
             $query->where('worker_id', $user->id);
         }
 
-        return $query->orderByDesc('chat_messages_max_created_at')->get();
+        return $query
+            ->orderByDesc('chat_messages_max_created_at')
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     /**

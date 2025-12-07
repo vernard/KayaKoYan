@@ -1,1 +1,5 @@
-@import '../../app.css';
+@import 'tailwindcss';
+@source '../../../views/filament/worker/**/*.blade.php';
+@import '../../../../vendor/filament/filament/resources/css/index.css';
+
+@variant dark (&:where(.dark, .dark *));

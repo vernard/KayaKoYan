@@ -75,9 +75,9 @@
 
                         <div class="mt-6 pt-6 border-t border-gray-200">
                             <a href="{{ route('worker.profile', $listing->user->workerProfile->slug ?? '#') }}" class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                                    <span class="text-amber-600 font-semibold text-lg">{{ substr($listing->user->name, 0, 1) }}</span>
-                                </div>
+                                <img src="{{ $listing->user->avatar_url_small }}"
+                                     alt="{{ $listing->user->name }}"
+                                     class="w-12 h-12 rounded-full object-cover">
                                 <div>
                                     <p class="font-semibold text-gray-900">{{ $listing->user->name }}</p>
                                     <p class="text-sm text-gray-500">View Profile &rarr;</p>

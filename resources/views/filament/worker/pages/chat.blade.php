@@ -1,13 +1,30 @@
 <x-filament-panels::page>
+    <audio id="notification-sound" src="/sounds/notification.mp3" preload="auto"></audio>
+
     <div class="h-[600px] flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" x-data="workerChatPage()" x-init="init()">
         <!-- Conversations List (Left Panel) -->
         <div class="w-80 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Messages</h2>
+                <!-- Filter Toggle -->
+                <div class="mt-2 flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+                    <button type="button"
+                            @click="showOngoingOnly = false"
+                            :class="!showOngoingOnly ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all">
+                        All
+                    </button>
+                    <button type="button"
+                            @click="showOngoingOnly = true"
+                            :class="showOngoingOnly ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all">
+                        Ongoing
+                    </button>
+                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto">
-                <template x-if="conversationsData.length === 0">
+                <template x-if="getFilteredConversations().length === 0">
                     <div class="p-8 text-center text-gray-500 dark:text-gray-400">
                         <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
@@ -16,7 +33,7 @@
                         <p class="text-sm mt-1">Customers will appear here when they message you</p>
                     </div>
                 </template>
-                <template x-for="conv in conversationsData" :key="conv.id">
+                <template x-for="conv in getFilteredConversations()" :key="conv.id">
                     <button type="button"
                        class="w-full text-left block p-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                        :class="{ 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-amber-500': selectedOrder === conv.id }"
@@ -27,8 +44,10 @@
                                  class="w-10 h-10 rounded-full object-cover flex-shrink-0">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-medium text-gray-900 dark:text-white truncate" x-text="conv.customer_name"></span>
-                                    <span x-show="conv.unread_count > 0" class="bg-red-500 text-white text-xs font-bold rounded-full h-5 min-w-5 flex items-center justify-center px-1" x-text="conv.unread_count"></span>
+                                    <span class="text-gray-900 dark:text-white truncate" :class="conv.unread_count > 0 ? 'font-bold' : 'font-medium'">
+                                        <span x-text="conv.customer_name"></span>
+                                        <span x-show="conv.unread_count > 0" class="text-amber-600 text-sm" x-text="'(' + conv.unread_count + ')'"></span>
+                                    </span>
                                 </div>
                                 <p class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="conv.order_number"></p>
                                 <template x-if="conv.last_message">
@@ -90,13 +109,31 @@
                                         <span class="font-semibold">Delivery Notice</span>
                                     </div>
                                 </template>
-                                <template x-if="message.type === 'file'">
-                                    <a :href="message.file_url" target="_blank" class="flex items-center gap-2 underline">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <template x-if="message.type === 'file' && message.is_image">
+                                    <div class="cursor-pointer" @click="openImageModal(message.file_url, message.file_name, message.formatted_file_size, formatTime(message.created_at))">
+                                        <img :src="message.file_url" :alt="message.file_name" class="max-w-full rounded-lg max-h-64 object-contain hover:opacity-90 transition-opacity">
+                                    </div>
+                                </template>
+                                <template x-if="message.type === 'file' && !message.is_image">
+                                    <div class="flex items-start gap-3 p-3 rounded-lg" :class="message.is_own ? 'bg-amber-500/20' : 'bg-gray-100 dark:bg-gray-700'">
+                                        <svg class="w-10 h-10 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                                         </svg>
-                                        <span x-text="message.file_name"></span>
-                                    </a>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-medium truncate" x-text="message.file_name"></p>
+                                            <p class="text-sm opacity-70">
+                                                <span x-text="message.formatted_file_size || formatFileSize(message.file_size)"></span>
+                                                <span class="mx-1">&bull;</span>
+                                                <span x-text="formatTime(message.created_at).split(',')[0]"></span>
+                                            </p>
+                                            <a :href="message.file_url" :download="message.file_name" class="inline-flex items-center gap-1 mt-2 text-sm font-medium" :class="message.is_own ? 'text-white hover:text-amber-200' : 'text-amber-600 hover:text-amber-700'">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                </svg>
+                                                Download
+                                            </a>
+                                        </div>
+                                    </div>
                                 </template>
                                 <p x-text="message.message" x-show="message.message"></p>
                                 <p :class="message.is_own ? 'text-amber-200' : 'text-gray-500 dark:text-gray-400'" class="text-xs mt-2">
@@ -121,14 +158,7 @@
 
                 <!-- Message Input -->
                 <div x-show="chatEnabled" class="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 flex-shrink-0">
-                    <form @submit.prevent="sendMessage()" class="flex gap-4">
-                        <input type="text" x-model="newMessage" @input="onInputChange()" placeholder="Type your message..."
-                               class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-800 dark:text-white">
-                        <button type="submit" :disabled="!newMessage.trim()"
-                                class="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-                            Send
-                        </button>
-                    </form>
+                    <x-chat.message-input :dark-mode="true" />
                 </div>
             </div>
 
@@ -143,292 +173,121 @@
                 </div>
             </div>
         </div>
+
+        <!-- Image Modal (shared component) -->
+        <x-chat.image-modal />
     </div>
 
     <script>
         function workerChatPage() {
+            // Use shared chat component with worker-specific config
+            const shared = window.createChatComponent({
+                apiBasePath: '/worker/chats',
+                conversationsKey: 'conversationsData',
+                participantPrefix: 'customer',
+                currentUserId: {{ auth()->id() }},
+            });
+
             return {
+                // Spread shared state and methods
+                ...shared,
+
+                // Worker-specific state
                 selectedOrder: {{ $selectedOrder ? $selectedOrder->id : 'null' }},
-                messages: [],
-                newMessage: '',
-                lastId: 0,
-                chatEnabled: true,
-                otherParticipantName: '',
-                otherParticipantAvatar: '',
-                orderNumber: '',
-                orderStatus: '',
                 conversationsData: @json($conversationsJson),
+                showOngoingOnly: false,
 
-                // WebSocket-related properties
-                channel: null,
-                presenceChannel: null,
-                isOtherTyping: false,
-                otherTypingName: '',
-                typingTimeout: null,
-                typingDebounce: null,
-                isOtherOnline: false,
+                // Filter conversations based on toggle
+                getFilteredConversations() {
+                    if (!this.showOngoingOnly) return this.conversationsData;
+                    return this.conversationsData.filter(c => c.chat_enabled);
+                },
 
+                // Worker-specific init
                 init() {
+                    // Initialize online status listener (from shared)
+                    this.initOnlineStatusListener();
+
+                    // Subscribe to notification channel for unread count updates and new conversations
+                    if (window.Echo) {
+                        window.Echo.private(`user.{{ auth()->id() }}.notifications`)
+                            .listen('.unread.updated', (data) => {
+                                window.updateUnreadTitle?.(data.count);
+                            })
+                            .listen('.conversation.new', (data) => {
+                                this.handleNewConversation(data);
+                            });
+
+                        // Subscribe to all conversation channels (from shared)
+                        this.subscribeToAllConversations();
+                    }
+
+                    // Initialize title with unread count (from shared)
+                    this.initUnreadTitle();
+
                     if (this.selectedOrder) {
                         this.loadConversation(this.selectedOrder);
-                        this.subscribeToChannel();
                     }
                 },
 
+                // Worker-specific: Load conversation from local data (no API fetch)
                 loadConversation(orderId) {
-                    const conversation = this.conversationsData.find(c => c.id === orderId);
+                    const conversation = this.getConversations().find(c => c.id === orderId);
                     if (conversation) {
-                        this.messages = conversation.messages;
-                        this.chatEnabled = conversation.chat_enabled;
-                        this.otherParticipantName = conversation.customer_name;
-                        this.otherParticipantAvatar = conversation.customer_avatar;
-                        this.orderNumber = conversation.order_number;
-                        this.orderStatus = conversation.status;
-                        this.lastId = this.messages.length > 0 ? this.messages[this.messages.length - 1].id : 0;
-                        this.$nextTick(() => this.scrollToBottom());
+                        // Use shared helper to load data
+                        this.loadConversationData(conversation);
 
-                        // Mark messages as read
+                        // Mark messages as read and reset unread count
+                        conversation.unread_count = 0;
                         this.markMessagesAsRead();
+
+                        // Update sidebar badge with new total unread count
+                        const totalUnread = this.getConversations().reduce((sum, c) => sum + (c.unread_count || 0), 0);
+                        window.updateUnreadTitle?.(totalUnread);
                     }
                 },
 
+                // Worker-specific: Select conversation (simpler, no URL update)
                 selectConversation(orderId) {
                     if (this.selectedOrder === orderId) return;
-
-                    // Unsubscribe from previous channel
-                    this.unsubscribeFromChannel();
 
                     this.selectedOrder = orderId;
                     this.isOtherTyping = false;
                     this.isOtherOnline = false;
                     this.loadConversation(orderId);
-                    this.subscribeToChannel();
                 },
 
-                subscribeToChannel() {
-                    if (!this.selectedOrder || !window.Echo) return;
+                // Worker-specific: Handle new conversation from customer
+                handleNewConversation(data) {
+                    const conversations = this.getConversations();
 
-                    const currentUserId = {{ auth()->id() }};
+                    // Check if conversation already exists
+                    if (conversations.find(c => c.id === data.id)) return;
 
-                    // Subscribe to private chat channel
-                    this.channel = window.Echo.private(`order.${this.selectedOrder}.chat`)
-                        .listen('.message.sent', (data) => {
-                            this.handleNewMessage(data, currentUserId);
-                        })
-                        .listen('.user.typing', (data) => {
-                            this.handleTypingIndicator(data, currentUserId);
-                        })
-                        .listen('.messages.read', (data) => {
-                            this.handleReadReceipt(data, currentUserId);
-                        });
-
-                    // Subscribe to presence channel for online status
-                    this.presenceChannel = window.Echo.join(`order.${this.selectedOrder}.presence`)
-                        .here((users) => {
-                            const otherUser = users.find(u => u.id !== currentUserId);
-                            this.isOtherOnline = !!otherUser;
-                        })
-                        .joining((user) => {
-                            if (user.id !== currentUserId) {
-                                this.isOtherOnline = true;
-                            }
-                        })
-                        .leaving((user) => {
-                            if (user.id !== currentUserId) {
-                                this.isOtherOnline = false;
-                            }
-                        });
-                },
-
-                unsubscribeFromChannel() {
-                    if (this.channel) {
-                        window.Echo.leave(`order.${this.selectedOrder}.chat`);
-                        this.channel = null;
-                    }
-                    if (this.presenceChannel) {
-                        window.Echo.leave(`order.${this.selectedOrder}.presence`);
-                        this.presenceChannel = null;
-                    }
-                },
-
-                handleNewMessage(data, currentUserId) {
-                    // Check if message already exists
-                    if (this.messages.find(m => m.id === data.id)) return;
-
-                    const message = {
-                        ...data,
-                        is_own: data.sender_id === currentUserId,
-                    };
-
-                    this.messages.push(message);
-                    this.lastId = message.id;
-                    this.$nextTick(() => this.scrollToBottom());
-
-                    // Update conversation preview
-                    this.updateConversationPreview(this.selectedOrder, message);
-
-                    // Mark as read if we're viewing this conversation
-                    if (!message.is_own) {
-                        this.markMessagesAsRead();
-                    }
-                },
-
-                handleTypingIndicator(data, currentUserId) {
-                    if (data.user_id === currentUserId) return;
-
-                    this.isOtherTyping = data.is_typing;
-                    this.otherTypingName = data.user_name;
-
-                    // Auto-clear typing indicator after 3 seconds
-                    if (data.is_typing) {
-                        clearTimeout(this.typingTimeout);
-                        this.typingTimeout = setTimeout(() => {
-                            this.isOtherTyping = false;
-                        }, 3000);
-                    }
-                },
-
-                handleReadReceipt(data, currentUserId) {
-                    if (data.reader_id === currentUserId) return;
-
-                    // Update read status on messages
-                    data.message_ids.forEach(id => {
-                        const message = this.messages.find(m => m.id === id);
-                        if (message) {
-                            message.read_at = data.read_at;
-                        }
+                    // Add new conversation to the top of the list
+                    conversations.unshift({
+                        id: data.id,
+                        customer_id: data.customer_id,
+                        customer_name: data.customer_name,
+                        customer_avatar: data.customer_avatar,
+                        order_number: data.order_number,
+                        status: data.status,
+                        status_color: data.status_color,
+                        chat_enabled: data.chat_enabled,
+                        unread_count: data.unread_count,
+                        last_message: data.last_message,
+                        messages: data.messages || [],
                     });
-                },
 
-                async sendMessage() {
-                    if (!this.newMessage.trim() || !this.chatEnabled) return;
+                    // Subscribe to this new conversation's channel
+                    this.subscribeToConversation(data.id);
 
-                    const formData = new FormData();
-                    formData.append('message', this.newMessage);
+                    // Play notification sound
+                    document.getElementById('notification-sound')?.play().catch(() => {});
 
-                    try {
-                        const response = await fetch(`/worker/chats/${this.selectedOrder}`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Accept': 'application/json',
-                            },
-                            body: formData
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            const message = data.message;
-
-                            // Add message to display immediately (optimistic update)
-                            const newMsg = {
-                                id: message.id,
-                                sender_id: message.sender_id,
-                                sender_name: message.sender.name,
-                                message: message.message,
-                                type: message.type,
-                                file_path: message.file_path,
-                                file_name: message.file_name,
-                                file_url: message.file_url,
-                                created_at: message.created_at,
-                                is_own: true,
-                                read_at: null,
-                            };
-
-                            if (!this.messages.find(m => m.id === message.id)) {
-                                this.messages.push(newMsg);
-                                this.lastId = message.id;
-                                this.$nextTick(() => this.scrollToBottom());
-                            }
-
-                            // Update conversation preview
-                            this.updateConversationPreview(this.selectedOrder, newMsg);
-
-                            this.newMessage = '';
-
-                            // Stop typing indicator
-                            this.sendTypingIndicator(false);
-                        }
-                    } catch (error) {
-                        console.error('Failed to send message:', error);
-                    }
-                },
-
-                // Debounced typing indicator
-                onInputChange() {
-                    this.sendTypingIndicator(true);
-
-                    clearTimeout(this.typingDebounce);
-                    this.typingDebounce = setTimeout(() => {
-                        this.sendTypingIndicator(false);
-                    }, 2000);
-                },
-
-                async sendTypingIndicator(isTyping) {
-                    if (!this.selectedOrder || !this.chatEnabled) return;
-
-                    try {
-                        await fetch(`/worker/chats/${this.selectedOrder}/typing`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({ is_typing: isTyping })
-                        });
-                    } catch (error) {
-                        // Silently fail for typing indicators
-                    }
-                },
-
-                async markMessagesAsRead() {
-                    if (!this.selectedOrder) return;
-
-                    try {
-                        await fetch(`/worker/chats/${this.selectedOrder}/read`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Accept': 'application/json',
-                            }
-                        });
-                    } catch (error) {
-                        console.error('Failed to mark messages as read:', error);
-                    }
-                },
-
-                scrollToBottom() {
-                    const container = this.$refs.messagesContainer;
-                    if (container) {
-                        container.scrollTop = container.scrollHeight;
-                    }
-                },
-
-                formatTime(isoString) {
-                    const date = new Date(isoString);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
-                           date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                },
-
-                updateConversationPreview(orderId, message) {
-                    const conv = this.conversationsData.find(c => c.id === orderId);
-                    if (conv) {
-                        conv.last_message = {
-                            message: message.message,
-                            sender_id: message.sender_id,
-                            is_file: message.type === 'file',
-                            is_delivery_notice: message.type === 'delivery_notice',
-                        };
-                        // If receiving a message (not own), increment unread count for non-selected conversations
-                        if (!message.is_own && orderId !== this.selectedOrder) {
-                            conv.unread_count = (conv.unread_count || 0) + 1;
-                        }
-                        // Clear unread count for selected conversation
-                        if (orderId === this.selectedOrder) {
-                            conv.unread_count = 0;
-                        }
-                    }
+                    // Update title with new unread count
+                    const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+                    window.updateUnreadTitle?.(totalUnread);
                 }
             }
         }

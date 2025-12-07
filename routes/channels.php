@@ -48,3 +48,16 @@ Broadcast::channel('order.{orderId}.presence', function (User $user, int $orderI
 
     return false;
 });
+
+// Global presence channel for app-wide online status
+Broadcast::channel('users.online', function (User $user) {
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+    ];
+});
+
+// User notification channel for unread counts
+Broadcast::channel('user.{userId}.notifications', function (User $user, int $userId) {
+    return $user->id === $userId;
+});

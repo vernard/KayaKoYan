@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Enums\ChatMessageType;
 use App\Events\ChatMessageSent;
 use App\Events\MessagesRead;
+use App\Events\NewConversationCreated;
+use App\Events\UnreadCountUpdated;
 use App\Events\UserTyping;
 use App\Models\ChatMessage;
 use App\Models\Order;
+use App\Models\User;
 use App\Services\ChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,8 +53,9 @@ class ChatController extends Controller
             $lastMessage = $c->chatMessages->last();
             return [
                 'id' => $c->id,
+                'other_participant_id' => $otherParticipant->id,
                 'other_participant_name' => $otherParticipant->name,
-                'other_participant_avatar' => $otherParticipant->avatar_url,
+                'other_participant_avatar' => $otherParticipant->avatar_url_small,
                 'order_number' => $c->order_number,
                 'unread_count' => $c->unread_count ?? 0,
                 'chat_enabled' => $c->isChatEnabled(),
@@ -100,12 +104,14 @@ class ChatController extends Controller
         $type = ChatMessageType::Text;
         $filePath = null;
         $fileName = null;
+        $fileSize = null;
 
         if ($request->hasFile('file')) {
             $type = ChatMessageType::File;
             $file = $request->file('file');
             $filePath = $file->store('chat-files/' . $order->id, 'public');
             $fileName = $file->getClientOriginalName();
+            $fileSize = $file->getSize();
         }
 
         $message = ChatMessage::create([
@@ -115,12 +121,31 @@ class ChatController extends Controller
             'type' => $type,
             'file_path' => $filePath,
             'file_name' => $fileName,
+            'file_size' => $fileSize,
         ]);
 
         $message->load('sender');
 
         // Broadcast the message via WebSocket
         broadcast(new ChatMessageSent($message, $order))->toOthers();
+
+        // If this is the first message from customer, notify worker of new conversation
+        $isFirstMessage = $order->chatMessages()->count() === 1;
+        $isCustomer = auth()->id() === $order->customer_id;
+        if ($isFirstMessage && $isCustomer) {
+            $order->load(['customer', 'listing']);
+            broadcast(new NewConversationCreated($order, $message));
+        }
+
+        // Broadcast unread count to the recipient
+        $recipientId = $order->customer_id === auth()->id()
+            ? $order->worker_id
+            : $order->customer_id;
+        $recipient = User::find($recipientId);
+        if ($recipient) {
+            $unreadCount = $this->chatService->getUnreadCount($recipient);
+            broadcast(new UnreadCountUpdated($recipientId, $unreadCount));
+        }
 
         return response()->json([
             'success' => true,
@@ -172,12 +197,16 @@ class ChatController extends Controller
         ChatMessage::whereIn('id', $unreadMessageIds)
             ->update(['read_at' => now()]);
 
-        // Broadcast read receipt
+        // Broadcast read receipt to the other participant
         broadcast(new MessagesRead(
             $order,
             $user,
             $unreadMessageIds
         ))->toOthers();
+
+        // Broadcast updated unread count to the current user's navigation badge
+        $newUnreadCount = $this->chatService->getUnreadCount($user);
+        broadcast(new UnreadCountUpdated($user->id, $newUnreadCount));
 
         return response()->json([
             'success' => true,
@@ -205,6 +234,9 @@ class ChatController extends Controller
                     'file_path' => $message->file_path,
                     'file_name' => $message->file_name,
                     'file_url' => $message->file_url,
+                    'file_size' => $message->file_size,
+                    'formatted_file_size' => $message->formatted_file_size,
+                    'is_image' => $message->isImage(),
                     'created_at' => $message->created_at->toISOString(),
                     'is_own' => $message->sender_id === auth()->id(),
                 ];
