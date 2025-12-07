@@ -39,8 +39,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.reverb-ws.rule=Host(`${REVERB_HOST}`) && PathPrefix(`/app`)"
-      - "traefik.http.routers.reverb-ws.entrypoints=websecure"
+      - "traefik.http.routers.reverb-ws.entryPoints=https"
       - "traefik.http.routers.reverb-ws.tls=true"
+      - "traefik.http.routers.reverb-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.reverb-ws.priority=100"
       - "traefik.http.services.reverb-ws.loadbalancer.server.port=8080"
     networks:
       - coolify
