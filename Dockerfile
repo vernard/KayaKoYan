@@ -29,11 +29,10 @@ RUN npm --version
 # Copy your application code
 COPY --chown=www-data:www-data . /var/www/html/
 
+RUN composer install --no-interaction --optimize-autoloader
 # Install NPM dependencies and build assets
 RUN npm install
 RUN npm run build
-
-RUN composer install --no-interaction --optimize-autoloader
 # Clean up image
 RUN rm /var/www/html/node_modules -rf
 
