@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+    image: ghcr.io/vernard/kayakoyan:latest
     volumes:
       - laravel_storage:/var/www/html/storage
     environment:
@@ -26,10 +23,7 @@ services:
       - reverb
 
   reverb:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+    image: ghcr.io/vernard/kayakoyan:latest
     volumes:
       - laravel_storage:/var/www/html/storage
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
